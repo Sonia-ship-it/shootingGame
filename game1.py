@@ -6,18 +6,15 @@ import serial
 
 use_keyboard = False  
 
-
 if not use_keyboard:
-
     arduino = serial.Serial('COM3', 9600, timeout=1)
     time.sleep(2)  
 
-
 pygame.init()
+pygame.mixer.init()
 WIDTH, HEIGHT = 600, 600
 win = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("War Shooter - Arduino Joystick")
-
 
 background_img = pygame.image.load("background.jpeg").convert()
 background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
@@ -33,13 +30,19 @@ enemy_img = pygame.transform.scale(enemy_img, (40, 40))
 
 enemy_bullet_img = pygame.transform.scale(bullet_img, (10, 20))
 
+shoot_sound = pygame.mixer.Sound("shoot.wav")
+hit_sound = pygame.mixer.Sound("hit.wav")
+win_sound = pygame.mixer.Sound("win.wav")
+lose_sound = pygame.mixer.Sound("lose.wav")
+pygame.mixer.music.load("background.mp3")
+pygame.mixer.music.set_volume(0.5)
+pygame.mixer.music.play(-1)  
 
 player_x = WIDTH // 2
 player_y = HEIGHT - 70
 player_health = 10
 bullets = []
 enemy_bullets = []
-
 
 NUM_ENEMIES = 5
 enemy_fire_rate = 800         
@@ -58,16 +61,13 @@ score = 0
 font = pygame.font.SysFont("Arial", 24)
 target_score = 20
 
-
 WHITE = (255,255,255)
 RED = (255,0,0)
 GREEN = (0,255,0)
 HUD_ALPHA = 180  
 
-
 hud_surface = pygame.Surface((WIDTH-20, 60), pygame.SRCALPHA)
 hud_surface.fill((30,30,30,HUD_ALPHA))
-
 
 running = True
 clock = pygame.time.Clock()
@@ -76,7 +76,6 @@ while running:
     clock.tick(30)
     win.blit(background_img, (0,0))
 
-    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -89,18 +88,20 @@ while running:
                 vals = data.split(",")
                 if len(vals) == 3:
                     xVal, yVal, button = map(int, vals)
-                
+                 
                     if xVal < 400:  
                         player_x -= 5
                     elif xVal > 600:  
                         player_x += 5
-                   
+               
                     if button == 0:
                         bullets.append([player_x, player_y])
+                        shoot_sound.play()
         except:
             pass
 
     player_x = max(25, min(WIDTH - 25, player_x))
+
 
     for b in bullets: b[1] -= 12
     bullets = [b for b in bullets if b[1] > 0]
@@ -115,7 +116,6 @@ while running:
             e['pos'] = [random.randint(50, WIDTH-50), random.randint(20, 150)]
             e['last_shot'] = current_time - random.randint(0, enemy_fire_rate)
             e['cooldown_end'] = 0
-
 
     for e in enemies:
         if shooters_this_frame >= MAX_SIMULTANEOUS_SHOOTERS:
@@ -132,7 +132,6 @@ while running:
         if not any(eb for eb in enemy_bullets if eb[0] == e['pos'][0]+20 and eb[1] == e['pos'][1]+30):
             e['cooldown_end'] = current_time + SIMULTANEOUS_COOLDOWN
 
-    
     for eb in enemy_bullets: eb[1] += enemy_bullet_speed
     enemy_bullets = [eb for eb in enemy_bullets if eb[1] < HEIGHT]
 
@@ -155,6 +154,7 @@ while running:
         if eb_rect.colliderect(player_rect):
             enemy_bullets.remove(eb)
             player_health -= 1
+            hit_sound.play()
             break
 
 
@@ -175,8 +175,8 @@ while running:
     score_text = font.render(f"Score: {score}", True, WHITE)
     win.blit(score_text, (WIDTH-130,15))
 
-   
     if score >= target_score:
+        win_sound.play()
         win_text = font.render("YOU WIN!", True, GREEN)
         pygame.draw.rect(win, (0,0,0,100), (WIDTH//2-80, HEIGHT//2-30, 160, 60))
         win.blit(win_text, (WIDTH//2-60, HEIGHT//2))
@@ -184,6 +184,7 @@ while running:
         pygame.time.delay(3000)
         running = False
     if player_health <= 0:
+        lose_sound.play()
         lose_text = font.render("GAME OVER", True, RED)
         pygame.draw.rect(win, (0,0,0,100), (WIDTH//2-90, HEIGHT//2-30, 180, 60))
         win.blit(lose_text, (WIDTH//2-80, HEIGHT//2))
